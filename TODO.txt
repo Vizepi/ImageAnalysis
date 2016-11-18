@@ -1,0 +1,9 @@
+Affinage : reduire les lignes à 1 pixel
+- Utiliser l'image de gradient
+- Pour chaque pixel regarder le gradient
+	- Si le gradient est inferieur au gradient du pixel qu'il pointe, alors on supprime ce gradient
+
+Detection des lignes de contours :
+- Pour chaque pixel restant, tester s'il a de voisins si 1 ou 2 se suivants, alors bout de contours
+- Fermeture : etendre dans la direction du contours
+

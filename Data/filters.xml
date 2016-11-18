@@ -1,0 +1,35 @@
+<filters>
+	<filter name="calcul_gradient" size="3" divisor="6">
+		<point value="-1"/>
+		<point value="0"/>
+		<point value="1"/>
+		<point value="-1"/>
+		<point value="0"/>
+		<point value="1"/>
+		<point value="-1"/>
+		<point value="0"/>
+		<point value="1"/>
+	</filter>
+	<filter name="calcul_amplitude_saut" size="3" divisor="8">
+		<point value="-1"/>
+		<point value="0"/>
+		<point value="1"/>
+		<point value="-2"/>
+		<point value="0"/>
+		<point value="2"/>
+		<point value="-1"/>
+		<point value="0"/>
+		<point value="1"/>
+	</filter>
+	<filter name="calcul_pente_gradient" size="3" divisor="30">
+		<point value="-3"/>
+		<point value="-3"/>
+		<point value="5"/>
+		<point value="-3"/>
+		<point value="0"/>
+		<point value="5"/>
+		<point value="-3"/>
+		<point value="-3"/>
+		<point value="5"/>
+	</filter>
+</filters>
