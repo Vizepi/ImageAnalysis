@@ -58,6 +58,7 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(m_ui->actionExit, SIGNAL(triggered()), this, SLOT(Exit()));
 
 	connect(m_ui->actionRefine, SIGNAL(triggered()), this, SLOT(Refine()));
+	connect(m_ui->actionHough_Transform, SIGNAL(triggered()), this, SLOT(HoughTransform()));
 
 	connect(m_ui->actionReset, SIGNAL(triggered()), this, SLOT(Reset()));
 	connect(m_ui->actionUndo, SIGNAL(triggered()), this, SLOT(Undo()));
@@ -103,7 +104,7 @@ void MainWindow::ClearStack(QStack<MainWindow::Action>& s)
 	{
 		if(s.top().result != nullptr)
 		{
-			if(s.top().gradient != nullptr && !s.top().actionIsGradient)
+			if(s.top().gradient != nullptr && s.top().actionIsGradient)
 			{
 				delete s.top().gradient;
 			}
@@ -274,7 +275,11 @@ void MainWindow::Refine(void)
 
 void MainWindow::HoughTransform(void)
 {
-
+	Convolution::Image* acc;
+	Convolution::Image* img = Convolution::Hough(*m_imageInternal[1], *m_imageInternal[1], &acc, 180, 1);
+	Convolution::SaveImage(*acc, "hough.png");
+	delete acc;
+	delete img;
 }
 
 void MainWindow::Reset(void)

@@ -74,5 +74,6 @@ void TresholdBox::OnValidate(void)
 
 void TresholdBox::OnCancel(void)
 {
+	m_validated = false;
 	close();
 }

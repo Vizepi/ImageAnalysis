@@ -334,7 +334,7 @@ int perm9 [81] = {
 						{
 							continue;
 						}
-						if(gradient.pixels[(i + x) + (j + y) * out->width] > gradient.pixels[i + j * out->width])
+						if(tresholded.pixels[(i + x) + (j + y) * out->width] != 0 && gradient.pixels[(i + x) + (j + y) * out->width] > gradient.pixels[i + j * out->width])
 						{
 							found = true;
 						}
@@ -591,7 +591,7 @@ inline double ConvertAngleRtoD(double alpha)
 	return alpha / 180.0 / M_PI;
 }
 
-/*static*/ Convolution::Image* Hough(const Convolution::Image& in, const Convolution::Image& original, Convolution::Image** accumulator, int alphaPrecision, int lineCount)
+/*static*/ Convolution::Image* Convolution::Hough(const Convolution::Image& in, const Convolution::Image& original, Convolution::Image** accumulator, int alphaPrecision, int lineCount)
 {
 	int accHeight = (sqrt(2.0) * (double)(in.height > in.width ? in.height : in.width)) / 2.0;
 	int size = alphaPrecision * accHeight * 2.0;
@@ -629,10 +629,10 @@ inline double ConvertAngleRtoD(double alpha)
 
 	*accumulator = new Convolution::Image(alphaPrecision, accHeight * 2.0, Convolution::Image::Format::Indexed8);
 
-	maxHough /= 255;
+	double multiplier = 255.0 / maxHough;
 	for(int i = 0; i < size; ++i)
 	{
-		(*accumulator)->pixels[i] = accu[i] / maxHough;
+		(*accumulator)->pixels[i] = accu[i] * multiplier;
 	}
 
 	return out;
