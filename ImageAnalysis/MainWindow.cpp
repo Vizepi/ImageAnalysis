@@ -272,6 +272,11 @@ void MainWindow::Refine(void)
 	Do(result, false, "Refine edges");
 }
 
+void MainWindow::HoughTransform(void)
+{
+
+}
+
 void MainWindow::Reset(void)
 {
 	if(m_imageInternal[1] != nullptr)
