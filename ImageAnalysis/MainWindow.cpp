@@ -104,7 +104,7 @@ void MainWindow::ClearStack(QStack<MainWindow::Action>& s)
 	{
 		if(s.top().result != nullptr)
 		{
-			if(s.top().gradient != nullptr && s.top().actionIsGradient)
+			if(s.top().gradient != nullptr)
 			{
 				delete s.top().gradient;
 			}
@@ -276,10 +276,10 @@ void MainWindow::Refine(void)
 void MainWindow::HoughTransform(void)
 {
 	Convolution::Image* acc;
-	Convolution::Image* img = Convolution::Hough(*m_imageInternal[1], *m_imageInternal[1], &acc, 180, 1);
+	Convolution::Image* result = Convolution::Hough(*m_imageInternal[1], *m_imageInternal[0], &acc, 180, 100, 9, 0xff0000);
 	Convolution::SaveImage(*acc, "hough.png");
 	delete acc;
-	delete img;
+	Do(result, false, "Hough transformation");
 }
 
 void MainWindow::Reset(void)
@@ -344,7 +344,7 @@ void MainWindow::Do(Convolution::Image* image, bool gradient, const QString &act
 	Action a = { m_imageInternal[1], m_lastAction, m_gradient, m_actionIsGradient };
 	m_undo.push(a);
 	m_lastAction = action;
-	m_gradient = gradient ? Convolution::ToGrayScale(*image) : m_gradient;
+	m_gradient = gradient ? Convolution::ToGrayScale(*image) : (m_gradient == nullptr ? nullptr : new Convolution::Image(*m_gradient));
 	m_actionIsGradient = gradient;
 	UpdateActions();
 	SetImage(image, source);

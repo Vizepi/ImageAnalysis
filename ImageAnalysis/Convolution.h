@@ -54,17 +54,17 @@ struct Convolution
 		double 		divisor;
 	};
 
-	static inline uint32_t PixelSize(Convolution::Image::Format format);
+	static inline uint32_t PixelSize(Image::Format format);
 
 	static Image* ApplyFilter(const Image& image, const Filter& filter, Filter::SideHandle sideHandle, bool multi = false);
 	static Filter* Rotate(const Filter& filter);
-	static Convolution::Image* Refine(const Convolution::Image& tresholded, const Convolution::Image& gradient);
-	static Convolution::Image* ToGrayScale(const Convolution::Image& in);
+	static Image* Refine(const Image& tresholded, const Image& gradient);
+	static Image* ToGrayScale(const Image& in);
 	static Image* LoadImage(const std::string& file);
 	static void SaveImage(const Image& image, const std::string& file);
 	static QImage ToQImage(const Image& image);
-	static Convolution::Image* Treshold(Convolution::Image* image, int tresholdMin, int tresholdMax);
-	static Convolution::Image* Hough(const Convolution::Image& in, const Convolution::Image& original, Convolution::Image** accumulator, int alphaPrecision, int lineCount);
+	static Image* Treshold(Image* image, int tresholdMin, int tresholdMax);
+	static Image* Hough(const Image& in, const Image& original, Image** accumulator, int alphaPrecision, int treshold, int maximas, int lineColor = 0xffffff);
 
 };
 

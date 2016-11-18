@@ -288,7 +288,7 @@ int perm9 [81] = {
 	45, 46, 47, 48, 41, 34, 27 };
 
 
-/*static*/ Convolution::Filter* Convolution::Rotate(const Filter& filter)
+/*static*/ Convolution::Filter* Convolution::Rotate(const Convolution::Filter& filter)
 {
 	Convolution::Filter* out = new Convolution::Filter();
 	out->divisor = filter.divisor;
@@ -440,7 +440,7 @@ void LoadIndexed8(Convolution::Image** out, const QImage& in)
 	return out;
 }
 
-/*static*/ QImage Convolution::ToQImage(const Image& image)
+/*static*/ QImage Convolution::ToQImage(const Convolution::Image& image)
 {
 	QImage out;
 	QVector<QRgb> colorTable(256);
@@ -591,10 +591,199 @@ inline double ConvertAngleRtoD(double alpha)
 	return alpha / 180.0 / M_PI;
 }
 
-/*static*/ Convolution::Image* Convolution::Hough(const Convolution::Image& in, const Convolution::Image& original, Convolution::Image** accumulator, int alphaPrecision, int lineCount)
+//
+//
+// COHEN-SUTHERLAND ALGORITHM TO CLIP LINE IN IMAGE
+
+typedef int OutCode;
+
+const int INSIDE = 0; // 0000
+const int LEFT = 1;   // 0001
+const int RIGHT = 2;  // 0010
+const int BOTTOM = 4; // 0100
+const int TOP = 8;    // 1000
+
+// Compute the bit code for a point (x, y) using the clip rectangle
+// bounded diagonally by (xmin, ymin), and (xmax, ymax)
+
+// ASSUME THAT xmax, xmin, ymax and ymin are global constants.
+
+OutCode ComputeOutCode(double x, double y, double xmin, double xmax, double ymin, double ymax)
+{
+	OutCode code;
+
+	code = INSIDE;          // initialised as being inside of [[clip window]]
+
+	if (x < xmin)           // to the left of clip window
+		code |= LEFT;
+	else if (x > xmax)      // to the right of clip window
+		code |= RIGHT;
+	if (y < ymin)           // below the clip window
+		code |= BOTTOM;
+	else if (y > ymax)      // above the clip window
+		code |= TOP;
+
+	return code;
+}
+
+// Cohen–Sutherland clipping algorithm clips a line from
+// P0 = (x0, y0) to P1 = (x1, y1) against a rectangle with
+// diagonal from (xmin, ymin) to (xmax, ymax).
+bool CohenSutherlandLineClip(	double x0, double y0, double x1, double y1,
+								double&x0o,double&y0o,double&x1o,double&y1o,
+								double xmin, double xmax, double ymin, double ymax)
+{
+	// compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
+	OutCode outcode0 = ComputeOutCode(x0, y0, xmin, xmax, ymin, ymax);
+	OutCode outcode1 = ComputeOutCode(x1, y1, xmin, xmax, ymin, ymax);
+	bool accept = false;
+
+	while (true) {
+		if (!(outcode0 | outcode1)) { // Bitwise OR is 0. Trivially accept and get out of loop
+			accept = true;
+			break;
+		} else if (outcode0 & outcode1) { // Bitwise AND is not 0. Trivially reject and get out of loop
+			break;
+		} else {
+			// failed both tests, so calculate the line segment to clip
+			// from an outside point to an intersection with clip edge
+			double x, y;
+
+			// At least one endpoint is outside the clip rectangle; pick it.
+			OutCode outcodeOut = outcode0 ? outcode0 : outcode1;
+
+			// Now find the intersection point;
+			// use formulas y = y0 + slope * (x - x0), x = x0 + (1 / slope) * (y - y0)
+			if (outcodeOut & TOP) {           // point is above the clip rectangle
+				x = x0 + (x1 - x0) * (ymax - y0) / (y1 - y0);
+				y = ymax;
+			} else if (outcodeOut & BOTTOM) { // point is below the clip rectangle
+				x = x0 + (x1 - x0) * (ymin - y0) / (y1 - y0);
+				y = ymin;
+			} else if (outcodeOut & RIGHT) {  // point is to the right of clip rectangle
+				y = y0 + (y1 - y0) * (xmax - x0) / (x1 - x0);
+				x = xmax;
+			} else if (outcodeOut & LEFT) {   // point is to the left of clip rectangle
+				y = y0 + (y1 - y0) * (xmin - x0) / (x1 - x0);
+				x = xmin;
+			}
+
+			// Now we move outside point to intersection point to clip
+			// and get ready for next pass.
+			if (outcodeOut == outcode0) {
+				x0 = x;
+				y0 = y;
+				outcode0 = ComputeOutCode(x0, y0, xmin, xmax, ymin, ymax);
+			} else {
+				x1 = x;
+				y1 = y;
+				outcode1 = ComputeOutCode(x1, y1, xmin, xmax, ymin, ymax);
+			}
+		}
+	}
+	if (accept) {
+		x0o = x0;
+		y0o = y0;
+		x1o = x1;
+		y1o = y1;
+	}
+	return accept;
+}
+
+// END COHEN-SUTHERLAND ALGORITHM
+//
+//
+
+void SetPixel(Convolution::Image* image, int x, int y, int color)
+{
+	if(x < 0 || x >= image->width || y < 0 || y >= image->height)
+	{
+		return;
+	}
+	switch(image->format)
+	{
+	case Convolution::Image::Format::RGB:
+		image->pixels[(x + y * image->width) * 3] =		(uint8_t)((color & 0xff0000) >> 16);
+		image->pixels[(x + y * image->width) * 3 + 1] = (uint8_t)((color & 0xff00) >> 8);
+		image->pixels[(x + y * image->width) * 3 + 2] = (uint8_t)((color & 0xff));
+		break;
+	case Convolution::Image::Format::ARGB:
+		image->pixels[(x + y * image->width) * 4] = 0xff;
+		image->pixels[(x + y * image->width) * 4 + 1] = (uint8_t)((color & 0xff0000) >> 16);
+		image->pixels[(x + y * image->width) * 4 + 2] = (uint8_t)((color & 0xff00) >> 8);
+		image->pixels[(x + y * image->width) * 4 + 3] = (uint8_t)((color & 0xff));
+		break;
+	case Convolution::Image::Format::Indexed8:
+		image->pixels[x + y * image->width] = color & 0xff;
+		break;
+	}
+}
+
+//
+//
+// BRESENHAM ALGORITHM TO DRAW A LINE
+
+void Bresenham(int x1, int y1, int const x2, int const y2, int color, Convolution::Image* image)
+{
+	int delta_x(x2 - x1);
+	// if x1 == x2, then it does not matter what we set here
+	signed char const ix((delta_x > 0) - (delta_x < 0));
+	delta_x = std::abs(delta_x) << 1;
+
+	int delta_y(y2 - y1);
+	// if y1 == y2, then it does not matter what we set here
+	signed char const iy((delta_y > 0) - (delta_y < 0));
+	delta_y = std::abs(delta_y) << 1;
+
+	SetPixel(image, x1, y1, color);
+
+	if (delta_x >= delta_y)
+	{
+		// error may go below zero
+		int error(delta_y - (delta_x >> 1));
+
+		while (x1 != x2)
+		{
+			if ((error >= 0) && (error || (ix > 0)))
+			{
+				error -= delta_x;
+				y1 += iy;
+			}
+			// else do nothing
+
+			error += delta_y;
+			x1 += ix;
+
+			SetPixel(image, x1, y1, color);
+		}
+	}
+	else
+	{
+		// error may go below zero
+		int error(delta_x - (delta_y >> 1));
+
+		while (y1 != y2)
+		{
+			if ((error >= 0) && (error || (iy > 0)))
+			{
+				error -= delta_y;
+				x1 += ix;
+			}
+			// else do nothing
+
+			error += delta_x;
+			y1 += iy;
+
+			SetPixel(image, x1, y1, color);
+		}
+	}
+}
+#include <iostream>
+/*static*/ Convolution::Image* Convolution::Hough(const Convolution::Image& in, const Convolution::Image& original, Convolution::Image** accumulator, int alphaPrecision, int treshold, int maximas, int lineColor)
 {
 	int accHeight = (sqrt(2.0) * (double)(in.height > in.width ? in.height : in.width)) / 2.0;
-	int size = alphaPrecision * accHeight * 2.0;
+	int accHeight2 = accHeight * 2.0;
+	int size = alphaPrecision * accHeight2;
 	int* accu = new int[size];
 	for(int i = 0; i< size; ++i)
 	{
@@ -625,7 +814,73 @@ inline double ConvertAngleRtoD(double alpha)
 			}
 		}
 	}
-	Convolution::Image* out = new Convolution::Image(in.width, in.height, original.format);
+	Convolution::Image* out = new Convolution::Image(original);
+
+	if(maximas > 9)
+	{
+		maximas = 9;
+	}
+	else if(maximas < 1)
+	{
+		maximas = 1;
+	}
+
+	maximas /= 2;
+
+	for(int rotation = 0; rotation < accHeight2; ++rotation)
+	{
+		for(int alpha = 0; alpha < alphaPrecision; ++alpha)
+		{
+			if(accu[alpha + rotation * alphaPrecision] >= treshold)
+			{
+				int max = accu[(rotation * alphaPrecision) + alpha];
+				for(int ly = -maximas; ly <= maximas; ++ly)
+				{
+					 for(int lx = -maximas; lx <= maximas; ++lx)
+					 {
+						  if((ly + rotation >= 0 && ly + rotation < accHeight2) && (lx + alpha >= 0 && lx + alpha < alphaPrecision))
+						  {
+							  int index = ((rotation + ly) * alphaPrecision) + (alpha + lx);
+							   if((int)accu[index] > max)
+							   {
+									max = accu[index];
+									ly = lx = maximas + 1; // break all loops
+							   }
+						  }
+					 }
+				}
+				if(max > accu[alpha + rotation * alphaPrecision])
+				{
+					continue;
+				}
+				int x1, y1, x2, y2;
+				x1 = y1 = x2 = y2 = 0;
+				double alphaRad = ConvertAngleDtoR(alpha);
+
+				if(alpha >= 45 && alpha <= 135)
+				{
+					 x1 = 0;
+					 y1 = ((double)(rotation - (accHeight2 / 2.0)) - (((double)x1 - (out->width / 2.0) ) * cos(alphaRad))) / sin(alphaRad) + (out->height / 2.0);
+					 x2 = out->width;
+					 y2 = ((double)(rotation - (accHeight2 / 2.0)) - (((double)x2 - (out->width / 2.0) ) * cos(alphaRad))) / sin(alphaRad) + (out->height / 2.0);
+				}
+				else
+				{
+					 y1 = 0;
+					 x1 = ((double)(rotation - (accHeight2 / 2.0)) - (((double)y1 - (out->height / 2.0) ) * sin(alphaRad))) / cos(alphaRad) + (out->width / 2.0);
+					 y2 = out->height;
+					 x2 = ((double)(rotation - (accHeight2 / 2.0)) - (((double)y2 - (out->height / 2.0) ) * sin(alphaRad))) / cos(alphaRad) + (out->width / 2.0);
+				}
+
+				double drawX1 = 0, drawX2 = 0, drawY1 = 0, drawY2 = 0;
+				if(CohenSutherlandLineClip(x1, y1, x2, y2, drawX1, drawY1, drawX2, drawY2, 0, out->width, 0, out->height))
+				{
+					Bresenham(drawX1, drawY1, drawX2, drawY2, lineColor, out);
+					std::cout << rotation << " " << alpha << std::endl;
+				}
+			}
+		}
+	}
 
 	*accumulator = new Convolution::Image(alphaPrecision, accHeight * 2.0, Convolution::Image::Format::Indexed8);
 
